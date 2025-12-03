@@ -1,0 +1,83 @@
+import pandas as pd
+
+import numpy as np
+
+from sklearn.model_selection import train_test_split
+
+from sklearn.linear_model import LogisticRegression
+
+from sklearn.metrics import roc_auc_score, classification_report
+
+#Stimulate Login attempt Data
+
+np.random.seed(42)
+
+n_samples =5000
+
+failed_attempts =np.random.poisson(lam=1.5, size=n_samples)
+
+time_since_last_login = np.random.exponential(scale=30, size=n_samples)
+
+unusual_ip=np.random.binomial(1,0.1,size=n_samples)
+
+device_change = np.random.binomial(1,0.5,size=n_samples)
+
+              #Target: unauthorized access
+              
+risk_score = (0.4*failed_attempts + 0.02*time_since_last_login +
+
+              1.5*unusual_ip+
+              
+              2.0*device_change +
+              
+              np.random.normal(0, 0.5, size=n_samples))
+              
+prob_unathorized = 1/(1+np.exp(-risk_score))
+
+unathorized = np.random.binomial(1, prob_unathorized)
+
+data=pd.DataFrame({
+
+    "failed_attempts":failed_attempts,
+    
+    "time_since_last_login": time_since_last_login,
+    
+    "unusual_ip" :unusual_ip,
+    
+    "device_change" :device_change,
+    
+    "unathorized": unathorized})
+    
+# 2 Train_Test Split
+
+X = data[["failed_attempts", "time_since_last_login", "unusual_ip", "device_change"]]
+
+y = data["unathorized"]
+
+X_train, X_test, y_train, y_test= train_test_split(X,y, test_size=0.3, random_state=42)
+
+#3 Logistic Regression Model
+
+model = LogisticRegression(max_iter =1000)
+
+model.fit(X_train, y_train)
+
+#Prediction probabilities
+
+risk_probs= model.predict_proba(X_test)[:,1]
+
+#4 Evaluate Model
+
+roc_auc = roc_auc_score(y_test,risk_probs)
+
+print("Model ROC-AUC:", roc_auc)
+
+print("Classification Report:\n", classification_report(y_test, model.predict(X_test)))
+
+# Decision Logic for account Lock
+
+lock_threshold = 0.8
+
+lock_decision = (risk_probs> lock_threshold). astype(int)
+
+print(f"Number of accounts flagged for lock: {np.sum(lock_decision)} out of {len(y_test)}")
